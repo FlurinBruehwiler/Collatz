@@ -1,5 +1,6 @@
 ﻿
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 //Time(() => ProgUnoptimized(10_000_000));
@@ -12,7 +13,7 @@ long ProgOptimized(int x)
     var dictCutoff = x;
 
     ushort[] numToLength = new ushort[dictCutoff];
-    long[] numbers = new long[1024];
+    Entry[] numbers = new Entry[1024];
 
     long maxI = 1;
     long maxLen = 0;
@@ -30,17 +31,19 @@ long ProgOptimized(int x)
         else
         {
             var lenOffset = GetSeries(i, out var numbersCount, numbers, dictCutoff, numToLength);
-            for (var index = 0; index < numbersCount; index++)
+            for (var index = numbersCount - 1; index >= 0; index--)
             {
                 var i1 = numbers[index];
-                StoreLenInCache(i1, (ushort)(lenOffset + (numbersCount - index)), dictCutoff, numToLength);
+
+                lenOffset += i1.StepCost;
+
+                StoreLenInCache(i1.Num, lenOffset, dictCutoff, numToLength);
             }
 
-            var newLen = lenOffset + numbersCount;
-            if (newLen > maxLen)
+            if (lenOffset > maxLen)
             {
                 maxI = i;
-                maxLen = newLen;
+                maxLen = lenOffset;
             }
         }
     }
@@ -79,7 +82,7 @@ bool GetCachedLen(long f, out ushort l, int dictCutoff, ushort[] numToLength)
 }
 
 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-ushort GetSeries(long num, out int numbersCount, long[] numbers, int dictCutoff, ushort[] numToLength)
+ushort GetSeries(long num, out int numbersCount, Entry[] numbers, int dictCutoff, ushort[] numToLength)
 {
     numbersCount = 0;
     do
@@ -89,15 +92,27 @@ ushort GetSeries(long num, out int numbersCount, long[] numbers, int dictCutoff,
             return l;
         }
 
-        numbers[numbersCount++] = num;
-
         if (num % 2 == 0)
         {
+            numbers[numbersCount++] = new Entry
+            {
+                Num = num,
+                StepCost = 1
+            };
             num = num / 2;
         }
         else
         {
-            num = 3 * num + 1;
+            long next = 3 * num + 1;
+            int shift = BitOperations.TrailingZeroCount(next);
+
+            numbers[numbersCount++] = new Entry
+            {
+                Num = num,
+                StepCost = (byte)(1 + shift)
+            };
+
+            num = next >> shift;
         }
     } while (num > 1);
 
@@ -150,4 +165,10 @@ void Time(Action callback, [CallerArgumentExpression("callback")] string express
     callback();
     var time = Stopwatch.GetElapsedTime(start);
     Console.WriteLine($"{expression} Took {time.TotalMilliseconds}ms");
+}
+
+struct Entry
+{
+    public long Num;
+    public byte StepCost;
 }

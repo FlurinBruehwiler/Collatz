@@ -7,12 +7,13 @@ using System.Runtime.CompilerServices;
 Time(() => ProgOptimized(90_000_000));
 Time(() => ProgOptimized(90_000_000));
 Time(() => ProgOptimized(90_000_000));
+Time(() => ProgOptimized(90_000_000));
 
 long ProgOptimized(int x)
 {
     var dictCutoff = x;
 
-    ushort[] numToLength = new ushort[dictCutoff];
+    ushort[] numToLength = new ushort[(dictCutoff + 1) >> 1];
     Entry[] numbers = new Entry[1024];
 
     long maxI = 1;
@@ -57,7 +58,7 @@ void StoreLenInCache(long k, ushort v, int dictCutoff, ushort[] numToLength)
 {
     if (k < dictCutoff)
     {
-        numToLength[k] = v;
+        numToLength[(int)(k / 2)] = v;
     }
 }
 
@@ -68,7 +69,7 @@ bool GetCachedLen(long f, out ushort l, int dictCutoff, ushort[] numToLength)
 
     if (f < dictCutoff)
     {
-        var a = numToLength[(int)f];
+        var a = numToLength[(int)(f / 2)];
         if (a == 0)
         {
             return false;
@@ -87,33 +88,25 @@ ushort GetSeries(long num, out int numbersCount, Entry[] numbers, int dictCutoff
     numbersCount = 0;
     do
     {
-        if (GetCachedLen(num, out var l, dictCutoff, numToLength))
+        if (num < dictCutoff)
         {
-            return l;
-        }
-
-        if (num % 2 == 0)
-        {
-            numbers[numbersCount++] = new Entry
+            var cachedLen = numToLength[(int)(num / 2)];
+            if (cachedLen != 0)
             {
-                Num = num,
-                StepCost = 1
-            };
-            num = num / 2;
+                return cachedLen;
+            }
         }
-        else
+
+        long next = 3 * num + 1;
+        int shift = BitOperations.TrailingZeroCount(next);
+
+        numbers[numbersCount++] = new Entry
         {
-            long next = 3 * num + 1;
-            int shift = BitOperations.TrailingZeroCount(next);
+            Num = num,
+            StepCost = (byte)(1 + shift)
+        };
 
-            numbers[numbersCount++] = new Entry
-            {
-                Num = num,
-                StepCost = (byte)(1 + shift)
-            };
-
-            num = next >> shift;
-        }
+        num = next >> shift;
     } while (num > 1);
 
     return 0;
@@ -148,7 +141,7 @@ long GetSeriesLength(long num)
 
         if (num % 2 == 0)
         {
-            num = num / 2;
+            num /= 2;
         }
         else
         {
@@ -165,6 +158,9 @@ void Time(Action callback, [CallerArgumentExpression("callback")] string express
     callback();
     var time = Stopwatch.GetElapsedTime(start);
     Console.WriteLine($"{expression} Took {time.TotalMilliseconds}ms");
+    GC.Collect();
+    GC.Collect();
+    GC.Collect();
 }
 
 struct Entry

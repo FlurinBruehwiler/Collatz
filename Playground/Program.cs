@@ -2,21 +2,21 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-Time(() => ProgUnoptimized(10_000_000));
+//Time(() => ProgUnoptimized(10_000_000));
 Time(() => ProgOptimized(90_000_000));
 
 long ProgOptimized(int x)
 {
-    var dictCutoff = x * 5;
+    var dictCutoff = x;
 
-    int[] numToLength = new int[dictCutoff];
-    Dictionary<long, int> numToLengthDict = [];
-    List<long> numbers = [];
+    ushort[] numToLength = new ushort[dictCutoff];
+    long[] numbers = new long[1024];
+    int numbersCount = 0;
 
     long maxI = 1;
     long maxLen = 0;
 
-    for (int i = 1; i < x; i++)
+    for (int i = 1; i < x; i += 2)
     {
         if (GetCachedLen(i, out var len))
         {
@@ -28,14 +28,14 @@ long ProgOptimized(int x)
         }
         else
         {
-            var (series, lenOffset) = GetSeries(i);
-            for (var index = 0; index < series.Count; index++)
+            var lenOffset = GetSeries(i);
+            for (var index = 0; index < numbersCount; index++)
             {
-                var i1 = series[index];
-                StoreLenInCache(i1, lenOffset + (series.Count - index));
+                var i1 = numbers[index];
+                StoreLenInCache(i1, (ushort)(lenOffset + (numbersCount - index)));
             }
 
-            var newLen = lenOffset + series.Count;
+            var newLen = lenOffset + numbersCount;
             if (newLen > maxLen)
             {
                 maxI = i;
@@ -44,22 +44,20 @@ long ProgOptimized(int x)
         }
     }
 
-    Console.WriteLine($"x: {x}, found: {maxI} (length: {numToLength[maxI]})");
+    Console.WriteLine($"x: {x}, found: {maxI} (length: {maxLen})");
     return maxI;
 
-    void StoreLenInCache(long k, int v)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void StoreLenInCache(long k, ushort v)
     {
         if (k < dictCutoff)
         {
             numToLength[k] = v;
         }
-        else
-        {
-            numToLengthDict.Add(k, v);
-        }
     }
 
-    bool GetCachedLen(long f, out int l)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool GetCachedLen(long f, out ushort l)
     {
         l = 0;
 
@@ -70,27 +68,26 @@ long ProgOptimized(int x)
             {
                 return false;
             }
-            else
-            {
-                l = a;
-                return true;
-            }
+
+            l = a;
+            return true;
         }
 
-        return numToLengthDict.TryGetValue(f, out l);
+        return false;
     }
 
-    (List<long>, int lenOffset) GetSeries(long num)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    ushort GetSeries(long num)
     {
-        numbers.Clear();
+        numbersCount = 0;
         do
         {
             if (GetCachedLen(num, out var l))
             {
-                return (numbers, l);
+                return l;
             }
 
-            numbers.Add(num);
+            numbers[numbersCount++] = num;
 
             if (num % 2 == 0)
             {
@@ -102,7 +99,7 @@ long ProgOptimized(int x)
             }
         } while (num > 1);
 
-        return (numbers, 0);
+        return 0;
     }
 }
 
